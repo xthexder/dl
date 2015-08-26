@@ -90,62 +90,65 @@ func (d *DL) Sym(symbol string, out interface{}) error {
 		return err
 	}
 	mu.Unlock()
-	val := reflect.ValueOf(out)
-	if !val.IsValid() || val.Kind() != reflect.Ptr {
-		return fmt.Errorf("out must be a pointer, not %T", out)
-	}
-	if val.IsNil() {
+	if out == nil {
 		return errors.New("out can't be nil")
 	}
-	elem := val.Elem()
-	switch elem.Kind() {
-	case reflect.Int:
+	switch val := out.(type) {
+	case *int:
 		// We treat Go's int as long, since it
 		// varies depending on the platform bit size
-		elem.SetInt(int64(*(*int)(handle)))
-	case reflect.Int8:
-		elem.SetInt(int64(*(*int8)(handle)))
-	case reflect.Int16:
-		elem.SetInt(int64(*(*int16)(handle)))
-	case reflect.Int32:
-		elem.SetInt(int64(*(*int32)(handle)))
-	case reflect.Int64:
-		elem.SetInt(int64(*(*int64)(handle)))
-	case reflect.Uint:
+		*val = *(*int)(handle)
+	case *int8:
+		*val = *(*int8)(handle)
+	case *int16:
+		*val = *(*int16)(handle)
+	case *int32:
+		*val = *(*int32)(handle)
+	case *int64:
+		*val = *(*int64)(handle)
+	case *uint:
 		// We treat Go's uint as unsigned long, since it
 		// varies depending on the platform bit size
-		elem.SetUint(uint64(*(*uint)(handle)))
-	case reflect.Uint8:
-		elem.SetUint(uint64(*(*uint8)(handle)))
-	case reflect.Uint16:
-		elem.SetUint(uint64(*(*uint16)(handle)))
-	case reflect.Uint32:
-		elem.SetUint(uint64(*(*uint32)(handle)))
-	case reflect.Uint64:
-		elem.SetUint(uint64(*(*uint64)(handle)))
-	case reflect.Uintptr:
-		elem.SetUint(uint64(*(*uintptr)(handle)))
-	case reflect.Float32:
-		elem.SetFloat(float64(*(*float32)(handle)))
-	case reflect.Float64:
-		elem.SetFloat(float64(*(*float64)(handle)))
-	case reflect.Func:
-		typ := elem.Type()
-		tr, err := makeTrampoline(typ, handle)
-		if err != nil {
-			return err
-		}
-		v := reflect.MakeFunc(typ, tr)
-		elem.Set(v)
-	case reflect.Ptr:
-		v := reflect.NewAt(elem.Type().Elem(), handle)
-		elem.Set(v)
-	case reflect.String:
-		elem.SetString(C.GoString(*(**C.char)(handle)))
-	case reflect.UnsafePointer:
-		elem.SetPointer(handle)
+		*val = *(*uint)(handle)
+	case *uint8:
+		*val = *(*uint8)(handle)
+	case *uint16:
+		*val = *(*uint16)(handle)
+	case *uint32:
+		*val = *(*uint32)(handle)
+	case *uint64:
+		*val = *(*uint64)(handle)
+	case *uintptr:
+		*val = *(*uintptr)(handle)
+	case *float32:
+		*val = *(*float32)(handle)
+	case *float64:
+		*val = *(*float64)(handle)
+	case *string:
+		*val = C.GoString(*(**C.char)(handle))
+	case *unsafe.Pointer:
+		*val = handle
 	default:
-		return fmt.Errorf("invalid out type %T", out)
+		ref := reflect.ValueOf(out)
+		if !ref.IsValid() || ref.Kind() != reflect.Ptr {
+			return fmt.Errorf("out must be a pointer, not %T", out)
+		}
+		elem := ref.Elem()
+		switch elem.Kind() {
+		case reflect.Func:
+			typ := elem.Type()
+			tr, err := makeTrampoline(typ, handle)
+			if err != nil {
+				return err
+			}
+			v := reflect.MakeFunc(typ, tr)
+			elem.Set(v)
+		case reflect.Ptr:
+			v := reflect.NewAt(elem.Type().Elem(), handle)
+			elem.Set(v)
+		default:
+			return fmt.Errorf("invalid out type %T", out)
+		}
 	}
 	return nil
 }
